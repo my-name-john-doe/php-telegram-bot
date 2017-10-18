@@ -138,6 +138,13 @@ class Telegram
     protected $run_commands = false;
 
     /**
+     * Access control list
+     *
+     * @var array
+     */
+    protected $acl = [];
+
+    /**
      * Telegram constructor.
      *
      * @param string $api_key
@@ -483,6 +490,8 @@ class Telegram
 
             //Handle a generic command or non existing one
             $this->last_command_response = $this->executeCommand('generic');
+        } else if (!$this->aclAllow($command)) {
+            $this->last_command_response = Request::emptyResponse();
         } else {
             //Botan.io integration, make sure only the actual command user executed is reported
             if ($this->botan_enabled) {
@@ -958,5 +967,51 @@ class Telegram
     public function isRunCommands()
     {
         return $this->run_commands;
+    }
+
+    /**
+     * Set a list of access control policies
+     *
+     * @param array $acl Array of \Longman\TelegramBot\Acl\Policy
+     *
+     * @see \Longman\TelegramBot\Acl\Policy For usage example
+     */
+    public function setAcl(array $acl)
+    {
+        $this->acl = $acl;
+    }
+
+    /**
+     * Check all policies if user is allowed to use command
+     * 
+     * Policies are checked in order as they are in the array set with setAcl().
+     * Checking continues until one policy matches (returns bool).
+     * If no policy matches, true is returned.
+     *
+     * @param string $command
+     * @param string $user
+     *
+     * @see \Longman\TelegramBot\Acl\Policy For usage example
+     *
+     * @return bool
+     */
+    public function aclAllow($command)
+    {
+        if(!($content = $this->update->getUpdateContent())) return true;
+        if(!($user = $content->getFrom())) return true;
+        $user = $user->getId();
+
+        foreach ($this->acl as $acl) {
+            if (!($acl instanceOf \Longman\TelegramBot\Acl\Policy)) {
+                continue;
+            }
+
+            $allow = $acl->allow($command, $user);
+            if (!is_null($allow)) {
+                return $allow;
+            }
+        }
+
+        return true;
     }
 }
