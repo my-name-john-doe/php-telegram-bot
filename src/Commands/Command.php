@@ -170,13 +170,6 @@ abstract class Command
             return Request::emptyResponse();
         }
 
-        if (strtolower($this->getName())!='callbackquery' && ($callback_query=$this->update->getCallbackQuery())) {
-            if ($this->isPrivateOnly() && ($message=$callback_query->getMessage()) && !$message->getChat()->isPrivateChat()) {
-                return Request::emptyResponse();
-            }
-            return $this->executeCallbackQuery();
-        }
-
         return $this->execute();
     }
 
@@ -206,17 +199,6 @@ abstract class Command
         ];
 
         return Request::sendMessage($data);
-    }
-
-    /**
-     * Execution if callback_query update was received
-     *
-     * @return \Longman\TelegramBot\Entities\ServerResponse
-     * @throws \Longman\TelegramBot\Exception\TelegramException
-     */
-    public function executeCallbackQuery()
-    {
-        return Request::emptyResponse();
     }
 
     /**
