@@ -9,6 +9,8 @@ Exclamation symbols (:exclamation:) note something of importance e.g. breaking c
 ### Deprecated
 ### Removed
 ### Fixed
+- Entity relations and wrong types for payments.
+- Allow empty string for `switch_inline_query` and `switch_inline_query_current_chat` (InlineKeyboardButton).
 ### Security
 
 ## [0.51.0] - 2017-12-05
