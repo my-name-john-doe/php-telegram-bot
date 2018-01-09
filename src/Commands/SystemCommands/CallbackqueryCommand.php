@@ -13,7 +13,6 @@ namespace Longman\TelegramBot\Commands\SystemCommands;
 use Longman\TelegramBot\Entities\AnswerCallbackQuery;
 use Longman\TelegramBot\Commands\SystemCommand;
 use Longman\TelegramBot\Request;
-use Longman\TelegramBot\Conversation;
 
 /**
  * Callback query command
@@ -38,7 +37,7 @@ class CallbackqueryCommand extends SystemCommand
     /**
      * @var string
      */
-    protected $version = '1.1.0';
+    protected $version = '1.2.0';
 
     /**
      * Command execute method
@@ -50,35 +49,12 @@ class CallbackqueryCommand extends SystemCommand
     {
         $callback_query = $this->getCallbackQuery();
 
-        // Call all registered callbacks.
-        $callbacks_ret = null;
+        // Call all registered callbacks, until one returns AnswerCallbackQuery.
         foreach (self::$callbacks as $callback) {
-            $callbacks_ret = $callback($callback_query);
+            $callbacks_ret = $callback($callback_query, $this->getTelegram());
+            if ($callbacks_ret instanceOf AnswerCallbackQuery) return $this->answer($callbacks_ret);
         }
 
-        // If callback data is a command, execute it.
-        if (preg_match('/^\/([^\s@]+)/', $callback_query->getData(), $command)) {
-            $ret = $this->telegram->executeCommand($command[1]);
-            if ($ret instanceOf AnswerCallbackQuery) return $this->answer($ret);
-        }
-
-        // Or, if there is an active conversation, execute the command that started it. 
-        else if ($message = $callback_query->getMessage()) {
-            $conversation = new Conversation(
-                $callback_query->getFrom()->getId(),
-                $message->getChat()->getId()
-            );
-
-            if ($conversation->exists() && ($command = $conversation->getCommand())) {
-                $ret = $this->telegram->executeCommand($command);
-                if ($ret instanceOf AnswerCallbackQuery) return $this->answer($ret);
-            }
-        }
-
-        // Then, return last callback's answer
-        if ($callbacks_ret instanceOf AnswerCallbackQuery) return $this->answer($callbacks_ret);
-
-        // Finally, answer this thing if nothing above did.
         return $this->answer(new AnswerCallbackQuery);
     }
 
