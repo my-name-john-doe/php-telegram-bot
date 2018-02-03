@@ -1,6 +1,7 @@
 <?php
 namespace Longman\TelegramBot\Helpers;
 use Longman\TelegramBot\Commands\Command;
+use Longman\TelegramBot\Entities\Update;
 
 trait CallbackQueryMessageTrait implements CallbackQueryHandlerInterface
 {

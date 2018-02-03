@@ -1,8 +1,8 @@
 <?php
 namespace Longman\TelegramBot\Helpers;
-use Longman\TelegramBot\Helpers\CallbackQueryHandlerInterface;
 use Longman\TelegramBot\Entities\CallbackQuery;
 use Longman\TelegramBot\Telegram;
+use Longman\TelegramBot\Conversation;
 
 class CallbackQueryHandler
 {
