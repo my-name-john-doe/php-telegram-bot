@@ -465,7 +465,8 @@ class Telegram
         $this->getCommandsList();
 
         //Make sure we don't try to process update that was already processed
-        if (count(DB::selectTelegramUpdate(1, $this->update->getUpdateId())) === 1) {
+        $last_id = DB::selectTelegramUpdate(1, $this->update->getUpdateId());
+        if ($last_id && count($last_id) === 1) {
             TelegramLog::debug('Duplicate update received, processing aborted!');
             return Request::emptyResponse();
         }
@@ -870,9 +871,8 @@ class Telegram
      */
     protected function ucfirstUnicode($str, $encoding = 'UTF-8')
     {
-        return
-            mb_strtoupper(mb_substr($str, 0, 1, $encoding), $encoding)
-            . mb_strtolower(mb_substr($str, 1, mb_strlen($str), $encoding), $encoding);
+        return mb_strtoupper(mb_substr($str, 0, 1, $encoding), $encoding)
+               . mb_strtolower(mb_substr($str, 1, mb_strlen($str), $encoding), $encoding);
     }
 
     /**
