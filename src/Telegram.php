@@ -10,8 +10,8 @@
 
 namespace Longman\TelegramBot;
 
-define('BASE_PATH', __DIR__);
-define('BASE_COMMANDS_PATH', BASE_PATH . '/Commands');
+defined('TB_BASE_PATH') || define('TB_BASE_PATH', __DIR__);
+defined('TB_BASE_COMMANDS_PATH') || define('TB_BASE_COMMANDS_PATH', TB_BASE_PATH . '/Commands');
 
 use Exception;
 use Longman\TelegramBot\Commands\Command;
@@ -30,7 +30,7 @@ class Telegram
      *
      * @var string
      */
-    protected $version = '0.52.0';
+    protected $version = '0.53.0';
 
     /**
      * Telegram API key
@@ -138,6 +138,21 @@ class Telegram
     protected $run_commands = false;
 
     /**
+     * Is running getUpdates without DB enabled
+     *
+     * @var bool
+     */
+    protected $getupdates_without_database = false;
+
+    /**
+     * Last update ID
+     * Only used when running getUpdates without a database
+     *
+     * @var integer
+     */
+    protected $last_update_id = null;
+
+    /**
      * Access control list
      *
      * @var array
@@ -169,7 +184,7 @@ class Telegram
         }
 
         //Add default system commands path
-        $this->addCommandsPath(BASE_COMMANDS_PATH . '/SystemCommands');
+        $this->addCommandsPath(TB_BASE_COMMANDS_PATH . '/SystemCommands');
 
         Request::initialize($this);
     }
@@ -327,26 +342,33 @@ class Telegram
             throw new TelegramException('Bot Username is not defined!');
         }
 
-        if (!DB::isDbConnected()) {
+        if (!DB::isDbConnected() && !$this->getupdates_without_database) {
             return new ServerResponse(
                 [
                     'ok'          => false,
-                    'description' => 'getUpdates needs MySQL connection!',
+                    'description' => 'getUpdates needs MySQL connection! (This can be overridden - see documentation)',
                 ],
                 $this->bot_username
             );
         }
 
+        $offset = 0;
+
         //Take custom input into account.
         if ($custom_input = $this->getCustomInput()) {
             $response = new ServerResponse(json_decode($custom_input, true), $this->bot_username);
         } else {
-            //DB Query
-            $last_update = DB::selectTelegramUpdate(1);
-            $last_update = reset($last_update);
+            if (DB::isDbConnected()) {
+                //Get last update id from the database
+                $last_update = DB::selectTelegramUpdate(1);
+                $last_update = reset($last_update);
 
-            //As explained in the telegram bot api documentation
-            $offset = isset($last_update['id']) ? $last_update['id'] + 1 : null;
+                $this->last_update_id = isset($last_update['id']) ? $last_update['id'] : null;
+            }
+
+            if ($this->last_update_id !== null) {
+                $offset = $this->last_update_id + 1;    //As explained in the telegram bot API documentation
+            }
 
             $response = Request::getUpdates(
                 [
@@ -358,10 +380,23 @@ class Telegram
         }
 
         if ($response->isOk()) {
+            $results = $response->getResult();
+
             //Process all updates
             /** @var Update $result */
-            foreach ((array) $response->getResult() as $result) {
+            foreach ($results as $result) {
                 $this->processUpdate($result);
+            }
+
+            if (!DB::isDbConnected() && !$custom_input && $this->last_update_id !== null && $offset === 0) {
+                //Mark update(s) as read after handling
+                Request::getUpdates(
+                    [
+                        'offset'  => $this->last_update_id + 1,
+                        'limit'   => 1,
+                        'timeout' => $timeout,
+                    ]
+                );
             }
         }
 
@@ -422,6 +457,7 @@ class Telegram
     public function processUpdate(Update $update)
     {
         $this->update = $update;
+        $this->last_update_id = $update->getUpdateId();
 
         //If all else fails, it's a generic message.
         $command = 'genericmessage';
@@ -432,7 +468,7 @@ class Telegram
 
             //Load admin commands
             if ($this->isAdmin()) {
-                $this->addCommandsPath(BASE_COMMANDS_PATH . '/AdminCommands', false);
+                $this->addCommandsPath(TB_BASE_COMMANDS_PATH . '/AdminCommands', false);
             }
 
             $type = $message->getType();
@@ -973,6 +1009,26 @@ class Telegram
     public function isRunCommands()
     {
         return $this->run_commands;
+    }
+
+    /**
+     * Switch to enable running getUpdates without a database
+     *
+     * @param bool $enable
+     */
+    public function useGetUpdatesWithoutDatabase($enable = true)
+    {
+        $this->getupdates_without_database = $enable;
+    }
+
+    /**
+     * Return last update id
+     *
+     * @return int
+     */
+    public function getLastUpdateId()
+    {
+        return $this->last_update_id;
     }
 
     /**
